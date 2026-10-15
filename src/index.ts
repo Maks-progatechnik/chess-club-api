@@ -1,6 +1,7 @@
 import { clerkMiddleware, getAuth } from '@clerk/hono'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { readAutumnBoard } from './autumn'
 import { sortMembers, toMember } from './members'
 
 const app = new Hono()
@@ -57,6 +58,19 @@ app.get('/members', async (c) => {
 
   const { data } = await c.get('clerk').users.getUserList({ limit: 100 })
   return c.json({ members: sortMembers(data.map(toMember), userId) })
+})
+
+app.get('/tournaments/autumn-2026', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  return c.json(await readAutumnBoard())
 })
 
 export default app
