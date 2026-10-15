@@ -1,11 +1,10 @@
-To install dependencies:
+# Chess Club API
+
 ```sh
 bun install
-```
-
-To run:
-```sh
 bun run dev
 ```
 
-open http://localhost:3000
+http://localhost:3000
+
+Set `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` in `.env`.
