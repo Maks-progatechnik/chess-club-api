@@ -4,6 +4,8 @@
     "dev": "bun run --hot src/index.ts"
   },
   "dependencies": {
+    "@clerk/backend": "^3.24.0",
+    "@clerk/hono": "^0.1.89",
     "hono": "^4.13.13"
   },
   "devDependencies": {
