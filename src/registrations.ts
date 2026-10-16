@@ -1,3 +1,7 @@
+import { sql } from 'drizzle-orm'
+import { db } from './db/client'
+import { signups } from './db/schema'
+
 export interface ISignup {
   name: string
   respondent: string
@@ -7,152 +11,81 @@ export interface ISignup {
 }
 
 export type AddSignupResult = { ok: true; signup: ISignup } | { ok: false; error: string }
+export type RemoveSignupResult = { ok: true } | { ok: false; error: string }
 
-const signupFile = new URL('./data/autumn-2026.csv', import.meta.url)
-
-let writeQueue: Promise<void> = Promise.resolve()
+interface ILooseRecord {
+  [key: string]: unknown
+}
 
 export async function readSignups(): Promise<ISignup[]> {
-  const file = Bun.file(signupFile)
-  const rows = parseCsv(await file.text())
-  const [header, ...records] = rows
-  if (!header) {
-    return []
-  }
+  const rows = await db.select().from(signups).orderBy(signups.id)
+  return rows.map(toSignup)
+}
 
-  const columns = Object.fromEntries(header.map((name, index) => [name.trim(), index]))
-
-  return records.flatMap((record) => {
-    const name = field(record, columns, 'Participant')
-    if (!name) {
-      return []
-    }
-    return [
-      {
+export async function addSignup(name: string, level: string): Promise<AddSignupResult> {
+  try {
+    const [row] = await db
+      .insert(signups)
+      .values({
         name,
-        respondent: field(record, columns, 'Respondent') || name,
-        level: field(record, columns, 'Chess level') || 'Beginner',
-        username: optionalField(record, columns, 'Chess.com username'),
-        timeControl: optionalField(record, columns, 'Preferred time control'),
-      },
-    ]
-  })
-}
+        respondent: name,
+        level: levelLabel(level),
+        username: null,
+        timeControl: null,
+      })
+      .returning()
 
-export function addSignup(name: string, level: string): Promise<AddSignupResult> {
-  const signup: ISignup = {
-    name,
-    respondent: name,
-    level: levelLabel(level),
-    username: null,
-    timeControl: null,
-  }
-
-  return enqueue(async () => {
-    const existing = await readSignups()
-    const taken = existing.some((row) => row.name.toLowerCase() === signup.name.toLowerCase())
-    if (taken) {
-      return { ok: false, error: `${signup.name} is already on the signup sheet.` }
+    if (!row) {
+      return { ok: false, error: 'Could not add this player.' }
     }
 
-    const file = Bun.file(signupFile)
-    const text = await file.text()
-    const prefix = text.length === 0 || text.endsWith('\n') ? text : `${text}\n`
-    const line = [
-      signup.name,
-      signup.respondent,
-      signup.level,
-      '',
-      '',
-    ]
-      .map(escapeCell)
-      .join(',')
-    await Bun.write(signupFile, `${prefix}${line}\n`)
-    return { ok: true, signup }
-  })
+    return { ok: true, signup: toSignup(row) }
+  } catch (error) {
+    if (isSignupNameTaken(error)) {
+      return { ok: false, error: `${name} is already on the signup sheet.` }
+    }
+    throw error
+  }
 }
 
-function enqueue<T>(task: () => Promise<T>): Promise<T> {
-  const run = writeQueue.then(task, task)
-  writeQueue = run.then(
-    () => undefined,
-    () => undefined,
-  )
-  return run
+export async function removeSignup(name: string): Promise<RemoveSignupResult> {
+  const deleted = await db
+    .delete(signups)
+    .where(sql`lower(${signups.name}) = ${name.toLowerCase()}`)
+    .returning({ id: signups.id })
+
+  if (!deleted.length) {
+    return { ok: false, error: 'That player is not on the signup sheet.' }
+  }
+
+  return { ok: true }
+}
+
+function toSignup(row: typeof signups.$inferSelect): ISignup {
+  return {
+    name: row.name,
+    respondent: row.respondent,
+    level: row.level,
+    username: row.username,
+    timeControl: row.timeControl,
+  }
 }
 
 function levelLabel(level: string): string {
   return level.trim().toLowerCase() === 'advanced' ? 'Advanced' : 'Beginner'
 }
 
-function field(record: string[], columns: Record<string, number>, name: string): string {
-  return clean(record[columns[name] ?? -1] ?? '')
-}
-
-function optionalField(record: string[], columns: Record<string, number>, name: string): string | null {
-  const value = field(record, columns, name)
-  return value || null
-}
-
-function clean(value: string): string {
-  return value.replace(/\s+/g, ' ').trim()
-}
-
-function escapeCell(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replaceAll('"', '""')}"`
-  }
-  return value
-}
-
-function parseCsv(text: string): string[][] {
-  const rows: string[][] = []
-  let row: string[] = []
-  let cell = ''
-  let inQuotes = false
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index]
-    const next = text[index + 1]
-
-    if (inQuotes) {
-      if (char === '"' && next === '"') {
-        cell += '"'
-        index += 1
-      } else if (char === '"') {
-        inQuotes = false
-      } else {
-        cell += char
-      }
-      continue
+function isSignupNameTaken(error: unknown): boolean {
+  let current: unknown = error
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    if (typeof current !== 'object' || current === null) {
+      return false
     }
-
-    if (char === '"') {
-      inQuotes = true
-    } else if (char === ',') {
-      row.push(cell)
-      cell = ''
-    } else if (char === '\n' || char === '\r') {
-      if (char === '\r' && next === '\n') {
-        index += 1
-      }
-      row.push(cell)
-      if (row.some((value) => value.trim())) {
-        rows.push(row)
-      }
-      row = []
-      cell = ''
-    } else {
-      cell += char
+    const record = current as ILooseRecord
+    if (record.code === '23505') {
+      return true
     }
+    current = record.cause
   }
-
-  if (cell || row.length > 0) {
-    row.push(cell)
-    if (row.some((value) => value.trim())) {
-      rows.push(row)
-    }
-  }
-
-  return rows
+  return false
 }

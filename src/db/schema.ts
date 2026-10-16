@@ -35,6 +35,20 @@ export const draws = pgTable('draws', {
   result: jsonb('result').notNull(),
 })
 
+export const signups = pgTable(
+  'signups',
+  {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    respondent: text('respondent').notNull(),
+    level: text('level').notNull(),
+    username: text('username'),
+    timeControl: text('time_control'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('signups_name').on(sql`lower(${table.name})`)],
+)
+
 export const externalPlayers = pgTable(
   'external_players',
   {

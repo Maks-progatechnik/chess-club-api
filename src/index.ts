@@ -2,7 +2,7 @@ import { clerkMiddleware, getAuth } from '@clerk/hono'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { getMyAccount, listAccounts, saveMyAccount } from './accounts'
-import { addDummy, claimDummy, listDummies } from './dummies'
+import { addDummy, claimDummy, deleteDummy, listDummies } from './dummies'
 import { addDrawGame, listDraws, saveDraw } from './draws'
 import { listMyGames } from './my-games'
 import { getPlayer } from './players'
@@ -222,6 +222,31 @@ app.post('/dummies/claim', async (c) => {
   }
 
   return c.json(result.dummy)
+})
+
+app.delete('/dummies', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Choose a player.' }, 400)
+  }
+
+  const result = await deleteDummy(body)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+
+  return c.json({ name: result.name })
 })
 
 app.get('/draws', async (c) => {

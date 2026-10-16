@@ -1,8 +1,8 @@
-import { isNotNull } from 'drizzle-orm'
+import { isNotNull, sql } from 'drizzle-orm'
 import { linkMySignup, markSignup } from './accounts'
 import { db } from './db/client'
 import { accounts } from './db/schema'
-import { addSignup, readSignups } from './registrations'
+import { addSignup, readSignups, removeSignup } from './registrations'
 import type { ISignup } from './registrations'
 
 export interface IDummyUser {
@@ -26,6 +26,10 @@ interface ILooseRecord {
 export type DummyResult =
   | { ok: true; dummy: IDummyUser }
   | { ok: false; status: 400 | 409; error: string }
+
+export type DeleteDummyResult =
+  | { ok: true; name: string }
+  | { ok: false; status: 400; error: string }
 
 export async function listDummies(clerkUserId: string): Promise<IDummyUser[]> {
   await linkMySignup(clerkUserId)
@@ -68,6 +72,25 @@ export async function claimDummy(clerkUserId: string, body: unknown): Promise<Du
   }
 
   return { ok: true, dummy: toDummy(row, clerkUserId, clerkUserId) }
+}
+
+export async function deleteDummy(body: unknown): Promise<DeleteDummyResult> {
+  const name = readName(asRecord(body)?.name)
+  if (!name) {
+    return { ok: false, status: 400, error: 'Choose a player.' }
+  }
+
+  const removed = await removeSignup(name)
+  if (!removed.ok) {
+    return { ok: false, status: 400, error: removed.error }
+  }
+
+  await db
+    .update(accounts)
+    .set({ signupName: null })
+    .where(sql`lower(${accounts.signupName}) = ${name.toLowerCase()}`)
+
+  return { ok: true, name }
 }
 
 async function listClaims(): Promise<IClaim[]> {
