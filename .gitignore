@@ -1,6 +1,10 @@
 # deps
 node_modules/
 
+data/*.sqlite
+data/*.sqlite-wal
+data/*.sqlite-shm
+
 .env
 .env.*
 !.env.example

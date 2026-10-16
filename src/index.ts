@@ -1,8 +1,11 @@
 import { clerkMiddleware, getAuth } from '@clerk/hono'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { createAccount, listAccounts, seedAccountsIfEmpty } from './accounts'
 import { readAutumnBoard } from './autumn'
 import { sortMembers, toMember } from './members'
+
+await seedAccountsIfEmpty()
 
 const app = new Hono()
 
@@ -15,7 +18,7 @@ app.use(
   cors({
     origin: ['http://localhost:5173', 'http://localhost:5174'],
     allowHeaders: ['Authorization', 'Content-Type'],
-    allowMethods: ['GET', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
   }),
 )
 
@@ -58,6 +61,44 @@ app.get('/members', async (c) => {
 
   const { data } = await c.get('clerk').users.getUserList({ limit: 100 })
   return c.json({ members: sortMembers(data.map(toMember), userId) })
+})
+
+app.get('/accounts', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  return c.json({ accounts: await listAccounts() })
+})
+
+app.post('/accounts', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Send name and surname.' }, 400)
+  }
+
+  const result = await createAccount(body)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+
+  return c.json(result.account, 201)
 })
 
 app.get('/tournaments/autumn-2026', async (c) => {

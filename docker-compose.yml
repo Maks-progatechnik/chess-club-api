@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chess_club
+    ports:
+      - '5432:5432'
+    volumes:
+      - chess_club_pg:/var/lib/postgresql/data
+
+volumes:
+  chess_club_pg:
