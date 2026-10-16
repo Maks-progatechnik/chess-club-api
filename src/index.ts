@@ -11,10 +11,19 @@ const clerkConfigured = Boolean(
   process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY,
 )
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  ...(process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean),
+]
+
 app.use(
   '*',
   cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: allowedOrigins,
     allowHeaders: ['Authorization', 'Content-Type'],
     allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
   }),
@@ -24,7 +33,7 @@ if (clerkConfigured) {
   app.use(
     '*',
     clerkMiddleware({
-      authorizedParties: ['http://localhost:5173', 'http://localhost:5174'],
+      authorizedParties: allowedOrigins,
     }),
   )
 }
