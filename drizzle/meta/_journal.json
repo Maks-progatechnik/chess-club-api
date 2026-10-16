@@ -15,6 +15,13 @@
       "when": 1792136636490,
       "tag": "0001_flimsy_microbe",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792138365214,
+      "tag": "0002_dizzy_nuke",
+      "breakpoints": true
     }
   ]
 }

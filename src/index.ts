@@ -2,6 +2,7 @@ import { clerkMiddleware, getAuth } from '@clerk/hono'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { getMyAccount, listAccounts, saveMyAccount } from './accounts'
+import { listDraws, saveDraw } from './draws'
 import { readAutumnBoard } from './autumn'
 import { sortMembers, toMember } from './members'
 
@@ -119,6 +120,44 @@ app.put('/accounts/me', async (c) => {
   }
 
   return c.json(result.account)
+})
+
+app.get('/draws', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  return c.json({ draws: await listDraws() })
+})
+
+app.post('/draws', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Send beginner and advanced pairs.' }, 400)
+  }
+
+  const result = await saveDraw(body)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+
+  return c.json(result.draw, 201)
 })
 
 app.get('/tournaments/autumn-2026', async (c) => {

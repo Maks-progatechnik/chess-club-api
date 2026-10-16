@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { integer, pgTable, serial, text, uniqueIndex } from 'drizzle-orm/pg-core'
+import { integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const accounts = pgTable(
   'accounts',
@@ -13,3 +13,9 @@ export const accounts = pgTable(
   },
   (table) => [uniqueIndex('accounts_chess_com').on(sql`lower(${table.chessCom})`)],
 )
+
+export const draws = pgTable('draws', {
+  id: serial('id').primaryKey(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  result: jsonb('result').notNull(),
+})
