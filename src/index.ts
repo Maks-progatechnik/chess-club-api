@@ -125,4 +125,11 @@ app.get('/tournaments/autumn-2026', async (c) => {
   return c.json(await readAutumnBoard())
 })
 
-export default app
+const port = Number(process.env.PORT ?? 3000)
+
+export default {
+  port,
+  hostname: '0.0.0.0',
+  fetch: app.fetch,
+  idleTimeout: 60,
+}

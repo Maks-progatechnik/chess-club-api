@@ -11,4 +11,4 @@ Set `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` in `.env`.
 
 Accounts are in Postgres. Start it with `docker compose up -d` and set `DATABASE_URL` in `.env`.
 
-On Render the start command is `bun src/index.ts`. Set `DATABASE_URL` to the hosted database, not localhost.
+On Render, deploy with the Dockerfile. Set `DATABASE_URL` to the hosted database, not localhost.
