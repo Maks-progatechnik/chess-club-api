@@ -5,6 +5,7 @@ export const accounts = pgTable(
   'accounts',
   {
     id: serial('id').primaryKey(),
+    clerkUserId: text('clerk_user_id').notNull().unique(),
     name: text('name').notNull(),
     surname: text('surname').notNull(),
     chessCom: text('chess_com'),

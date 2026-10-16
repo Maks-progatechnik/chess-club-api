@@ -1,5 +1,4 @@
-import { count, sql } from 'drizzle-orm'
-import { readAutumnRegistrations } from './autumn'
+import { eq, sql } from 'drizzle-orm'
 import { db } from './db/client'
 import { accounts } from './db/schema'
 
@@ -25,6 +24,7 @@ interface ICreateAccount {
 
 interface IAccountRow {
   id: number
+  clerkUserId: string
   name: string
   surname: string
   chessCom: string | null
@@ -44,16 +44,41 @@ export async function listAccounts(): Promise<IAccount[]> {
   return rows.map(toAccount)
 }
 
-export async function createAccount(body: unknown): Promise<CreateAccountResult> {
+export async function getMyAccount(clerkUserId: string): Promise<IAccount | null> {
+  const [row] = await db.select().from(accounts).where(eq(accounts.clerkUserId, clerkUserId)).limit(1)
+  return row ? toAccount(row) : null
+}
+
+export async function saveMyAccount(clerkUserId: string, body: unknown): Promise<CreateAccountResult> {
   const parsed = parseCreateAccount(body)
   if (!parsed.ok) {
     return parsed
   }
 
+  const current = await getMyAccount(clerkUserId)
+
   try {
+    if (current) {
+      const [row] = await db
+        .update(accounts)
+        .set({
+          name: parsed.account.name,
+          surname: parsed.account.surname,
+          chessCom: parsed.account.chessCom,
+        })
+        .where(eq(accounts.clerkUserId, clerkUserId))
+        .returning()
+
+      if (!row) {
+        return { ok: false, status: 400, error: 'Could not save this account.' }
+      }
+      return { ok: true, account: toAccount(row) }
+    }
+
     const [row] = await db
       .insert(accounts)
       .values({
+        clerkUserId,
         name: parsed.account.name,
         surname: parsed.account.surname,
         chessCom: parsed.account.chessCom,
@@ -71,30 +96,6 @@ export async function createAccount(body: unknown): Promise<CreateAccountResult>
     }
     throw error
   }
-}
-
-export async function seedAccountsIfEmpty(): Promise<void> {
-  const [row] = await db.select({ total: count() }).from(accounts)
-  if (!row || row.total > 0) {
-    return
-  }
-
-  const registrations = await readAutumnRegistrations()
-  if (registrations.length === 0) {
-    return
-  }
-
-  await db.insert(accounts).values(
-    registrations.map((registration) => {
-      const person = splitName(registration.name)
-      return {
-        name: person.name,
-        surname: person.surname,
-        chessCom: registration.username,
-        elo: INITIAL_ELO,
-      }
-    }),
-  )
 }
 
 function parseCreateAccount(
@@ -128,13 +129,6 @@ function readChessCom(value: unknown): string | null | undefined {
   }
   const username = value.trim().replace(/^@/, '')
   return username || null
-}
-
-function splitName(fullName: string): { name: string; surname: string } {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean)
-  const surname = parts.length > 1 ? (parts[parts.length - 1] ?? '') : ''
-  const name = parts.length > 1 ? parts.slice(0, -1).join(' ') : (parts[0] ?? '')
-  return { name, surname: surname || name }
 }
 
 function toAccount(row: IAccountRow): IAccount {
