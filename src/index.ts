@@ -2,7 +2,10 @@ import { clerkMiddleware, getAuth } from '@clerk/hono'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { getMyAccount, listAccounts, saveMyAccount } from './accounts'
-import { listDraws, saveDraw } from './draws'
+import { addDummy, claimDummy, listDummies } from './dummies'
+import { addDrawGame, listDraws, saveDraw } from './draws'
+import { listMyGames } from './my-games'
+import { getPlayer } from './players'
 import { readAutumnBoard } from './autumn'
 import { sortMembers, toMember } from './members'
 
@@ -122,6 +125,105 @@ app.put('/accounts/me', async (c) => {
   return c.json(result.account)
 })
 
+app.get('/accounts/me/games', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const account = await getMyAccount(userId)
+  if (!account) {
+    return c.json({ games: [] })
+  }
+
+  return c.json({ games: await listMyGames(account) })
+})
+
+app.get('/players/:name', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const player = await getPlayer(c.req.param('name'))
+  if (!player) {
+    return c.json({ error: 'That player is not in the club.' }, 404)
+  }
+
+  return c.json({ player })
+})
+
+app.get('/dummies', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  return c.json({ dummies: await listDummies(userId) })
+})
+
+app.post('/dummies', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Name is required.' }, 400)
+  }
+
+  const result = await addDummy(body)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+
+  return c.json(result.dummy, 201)
+})
+
+app.post('/dummies/claim', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Choose a player.' }, 400)
+  }
+
+  const result = await claimDummy(userId, body)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+
+  return c.json(result.dummy)
+})
+
 app.get('/draws', async (c) => {
   if (!clerkConfigured) {
     return c.json({ error: 'Clerk is not configured on the API' }, 503)
@@ -158,6 +260,36 @@ app.post('/draws', async (c) => {
   }
 
   return c.json(result.draw, 201)
+})
+
+app.post('/draws/:id/games', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const drawId = Number(c.req.param('id'))
+  if (!Number.isInteger(drawId)) {
+    return c.json({ error: 'That draw was not found.' }, 400)
+  }
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Send the match and a Chess.com game link.' }, 400)
+  }
+
+  const result = await addDrawGame(drawId, body)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+
+  return c.json(result.draw)
 })
 
 app.get('/tournaments/autumn-2026', async (c) => {
