@@ -7,6 +7,7 @@ interface IPairing {
   white: string
   black: string | null
   games: string[]
+  across?: boolean
 }
 
 interface IDrawResult {
@@ -165,11 +166,15 @@ function parsePair(value: unknown): IPairing | null {
   if (!games) {
     return null
   }
-  return {
+  const pair: IPairing = {
     white: value.white.trim(),
     black: typeof value.black === 'string' ? value.black.trim() || null : null,
     games,
   }
+  if (value.across === true) {
+    pair.across = true
+  }
+  return pair
 }
 
 function parseGames(value: unknown): string[] | null {
