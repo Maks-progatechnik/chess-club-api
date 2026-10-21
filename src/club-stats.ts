@@ -3,6 +3,9 @@ import type { IBoardDraw } from './match-score'
 export interface IOpeningCount {
   name: string
   games: number
+  whiteWins: number
+  blackWins: number
+  draws: number
 }
 
 export interface IClubStats {
@@ -19,7 +22,7 @@ export function statsFrom(draws: IBoardDraw[], members: number): IClubStats {
   let whiteWins = 0
   let blackWins = 0
   let drawn = 0
-  const openings = new Map<string, number>()
+  const openings = new Map<string, IOpeningCount>()
 
   for (const draw of draws) {
     for (const pair of draw.pairs) {
@@ -38,7 +41,7 @@ export function statsFrom(draws: IBoardDraw[], members: number): IClubStats {
           drawn += 1
         }
         if (game.opening) {
-          openings.set(game.opening, (openings.get(game.opening) ?? 0) + 1)
+          recordOpening(openings, game.opening, game.outcome)
         }
       }
     }
@@ -50,22 +53,27 @@ export function statsFrom(draws: IBoardDraw[], members: number): IClubStats {
     whiteWins,
     blackWins,
     draws: drawn,
-    openings: leadingOpenings(openings),
+    openings: [...openings.values()].sort(byUsage),
   }
 }
 
-function leadingOpenings(counts: Map<string, number>): IOpeningCount[] {
-  let best = 0
-  for (const count of counts.values()) {
-    if (count > best) {
-      best = count
-    }
+function recordOpening(openings: Map<string, IOpeningCount>, name: string, outcome: 'white' | 'black' | 'draw'): void {
+  const key = name.trim().toLowerCase()
+  const existing = openings.get(key)
+  const row = existing ?? { name: name.trim(), games: 0, whiteWins: 0, blackWins: 0, draws: 0 }
+  row.games += 1
+  if (outcome === 'white') {
+    row.whiteWins += 1
   }
-  if (best === 0) {
-    return []
+  if (outcome === 'black') {
+    row.blackWins += 1
   }
-  return [...counts.entries()]
-    .filter((entry) => entry[1] === best)
-    .map(([name, games]) => ({ name, games }))
-    .sort((left, right) => left.name.localeCompare(right.name))
+  if (outcome === 'draw') {
+    row.draws += 1
+  }
+  openings.set(key, row)
+}
+
+function byUsage(left: IOpeningCount, right: IOpeningCount): number {
+  return right.games - left.games || left.name.localeCompare(right.name)
 }
