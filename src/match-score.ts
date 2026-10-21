@@ -20,6 +20,7 @@ export interface IScoreGameInput {
   summary: string | null
   playedAt: string | null
   moveList: string | null
+  opening: string | null
 }
 
 export interface IScorePairInput {
@@ -37,6 +38,7 @@ export interface IBoardGame {
   summary: string | null
   playedAt: string | null
   moveList: string | null
+  opening: string | null
 }
 
 export interface IBoardPair {
@@ -154,6 +156,7 @@ export function scorePair(input: IScorePairInput, aliases: Map<string, string>):
       summary: game.summary,
       playedAt: game.playedAt,
       moveList: game.moveList,
+      opening: game.opening,
     })
   }
 

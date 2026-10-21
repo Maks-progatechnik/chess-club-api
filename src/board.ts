@@ -1,3 +1,7 @@
+import { achievementsFrom } from './achievements'
+import type { IAchievements } from './achievements'
+import { statsFrom } from './club-stats'
+import type { IClubStats } from './club-stats'
 import { listDraws } from './draws'
 import type { ISavedDraw } from './draws'
 import { lookupChessGame } from './chess-game-lookup'
@@ -9,6 +13,13 @@ import type { IBoardDraw, IClubBoard, IScoreAlias, IScoreGameInput, IScorePairIn
 import { readSignups } from './registrations'
 
 export type { IBoardDraw, IBoardGame, IBoardPair, IClubBoard, IStanding } from './match-score'
+export type { IAchievements, IRecordMark } from './achievements'
+export type { IClubStats, IOpeningCount } from './club-stats'
+
+interface IBoardResponse extends IClubBoard {
+  achievements: IAchievements
+  stats: IClubStats
+}
 
 const LOOKUP_LIMIT = 4
 
@@ -19,20 +30,28 @@ interface ISourcePair {
   across?: boolean
 }
 
-export async function readBoard(): Promise<IClubBoard> {
-  const [draws, aliases] = await Promise.all([listDraws(), loadAliases()])
+export async function readBoard(): Promise<IBoardResponse> {
+  const [draws, club] = await Promise.all([listDraws(), loadAliases()])
   const urls = uniqueUrls(draws)
   const lookedUp = await lookupAll(urls)
   const chronological = [...draws].sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id - right.id)
-  const scored = chronological.map((draw, index) => scoreDraw(draw, index + 1, lookedUp, aliases))
+  const scored = chronological.map((draw, index) => scoreDraw(draw, index + 1, lookedUp, club.aliases))
+  const standings = standingsFrom(scored)
 
   return {
     draws: [...scored].reverse(),
-    standings: standingsFrom(scored),
+    standings,
+    achievements: achievementsFrom(scored, standings),
+    stats: statsFrom(scored, club.members),
   }
 }
 
-async function loadAliases(): Promise<Map<string, string>> {
+interface IClubAliases {
+  aliases: Map<string, string>
+  members: number
+}
+
+async function loadAliases(): Promise<IClubAliases> {
   const [signups, claimed] = await Promise.all([
     readSignups(),
     db
@@ -58,7 +77,7 @@ async function loadAliases(): Promise<Map<string, string>> {
     const name = account.signupName?.trim() || `${account.name} ${account.surname}`.trim()
     rows.push({ username: account.chessCom, name })
   }
-  return aliasMap(rows)
+  return { aliases: aliasMap(rows), members: signups.length }
 }
 
 function scoreDraw(
@@ -105,6 +124,7 @@ function toKnownGame(url: string, details: IChessGameDetails | null): IScoreGame
       summary: null,
       playedAt: null,
       moveList: null,
+      opening: null,
     }
   }
 
@@ -117,6 +137,7 @@ function toKnownGame(url: string, details: IChessGameDetails | null): IScoreGame
     summary: details.resultMessage,
     playedAt: details.playedAt,
     moveList: details.moveList,
+    opening: details.opening,
   }
 }
 
