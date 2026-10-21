@@ -7,7 +7,7 @@ import type { ISignup } from './registrations'
 
 export interface IDummyUser {
   name: string
-  level: string
+  level: string | null
   chessCom: string | null
   timeControl: string | null
   claimed: boolean
@@ -43,7 +43,7 @@ export async function addDummy(body: unknown): Promise<DummyResult> {
     return { ok: false, status: 400, error: 'Name is required.' }
   }
 
-  const added = await addSignup(parsed.name, parsed.level)
+  const added = await addSignup(parsed.name)
   if (!added.ok) {
     return { ok: false, status: 409, error: added.error }
   }
@@ -118,7 +118,7 @@ function toDummy(row: ISignup, owner: string | null, clerkUserId: string): IDumm
   }
 }
 
-function parseAdd(body: unknown): { name: string; level: string } | null {
+function parseAdd(body: unknown): { name: string } | null {
   const record = asRecord(body)
   if (!record) {
     return null
@@ -127,8 +127,7 @@ function parseAdd(body: unknown): { name: string; level: string } | null {
   if (!name) {
     return null
   }
-  const level = typeof record.level === 'string' ? record.level : 'Beginner'
-  return { name, level }
+  return { name }
 }
 
 function readName(value: unknown): string | null {

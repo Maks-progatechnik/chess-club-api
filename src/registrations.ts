@@ -5,7 +5,7 @@ import { signups } from './db/schema'
 export interface ISignup {
   name: string
   respondent: string
-  level: string
+  level: string | null
   username: string | null
   timeControl: string | null
 }
@@ -22,14 +22,14 @@ export async function readSignups(): Promise<ISignup[]> {
   return rows.map(toSignup)
 }
 
-export async function addSignup(name: string, level: string): Promise<AddSignupResult> {
+export async function addSignup(name: string): Promise<AddSignupResult> {
   try {
     const [row] = await db
       .insert(signups)
       .values({
         name,
         respondent: name,
-        level: levelLabel(level),
+        level: null,
         username: null,
         timeControl: null,
       })
@@ -69,10 +69,6 @@ function toSignup(row: typeof signups.$inferSelect): ISignup {
     username: row.username,
     timeControl: row.timeControl,
   }
-}
-
-function levelLabel(level: string): string {
-  return level.trim().toLowerCase() === 'advanced' ? 'Advanced' : 'Beginner'
 }
 
 function isSignupNameTaken(error: unknown): boolean {

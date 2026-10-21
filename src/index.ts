@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { getMyAccount, listAccounts, saveMyAccount } from './accounts'
 import { addDummy, claimDummy, deleteDummy, listDummies } from './dummies'
+import { readBoard } from './board'
 import { addDrawGame, listDraws, saveDraw } from './draws'
 import { listMyGames } from './my-games'
 import { getPlayer } from './players'
@@ -247,6 +248,19 @@ app.delete('/dummies', async (c) => {
   }
 
   return c.json({ name: result.name })
+})
+
+app.get('/board', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  return c.json(await readBoard())
 })
 
 app.get('/draws', async (c) => {

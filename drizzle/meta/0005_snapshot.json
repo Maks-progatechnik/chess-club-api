@@ -714,7 +714,7 @@
           "name": "level",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "username": {
           "name": "username",

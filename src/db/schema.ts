@@ -41,7 +41,7 @@ export const signups = pgTable(
     id: serial('id').primaryKey(),
     name: text('name').notNull(),
     respondent: text('respondent').notNull(),
-    level: text('level').notNull(),
+    level: text('level'),
     username: text('username'),
     timeControl: text('time_control'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

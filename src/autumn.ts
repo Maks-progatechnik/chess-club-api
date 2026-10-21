@@ -6,7 +6,7 @@ export const ADVANCED_RATING = 800
 
 export interface IRegistration {
   name: string
-  level: string
+  level: string | null
   username: string | null
   timeControl: string | null
 }
@@ -26,7 +26,7 @@ export interface IAutumnPlayer {
   blitz: number | null
   bullet: number | null
   games: number | null
-  preference: PlayerLevel
+  preference: PlayerLevel | null
   unavailable: boolean
   flag: string | null
 }
@@ -126,7 +126,10 @@ function toPlayer(registration: IRegistration, accounts: Map<string, ChessLookup
   }
 }
 
-function readPreference(level: string): PlayerLevel {
+function readPreference(level: string | null): PlayerLevel | null {
+  if (!level?.trim()) {
+    return null
+  }
   return level.trim().toLowerCase() === 'advanced' ? 'advanced' : 'beginner'
 }
 
