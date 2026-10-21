@@ -1,4 +1,5 @@
 import { chessGameRef } from './chess-game'
+import { openingName } from './opening-name'
 
 const CALLBACK = 'https://www.chess.com/callback'
 const USER_AGENT = 'ChessClubApp/1.0 (club games)'
@@ -19,6 +20,7 @@ export interface IChessGameDetails {
   timeControl: string | null
   opening: string | null
   playedAt: string | null
+  moveList: string | null
 }
 
 interface ICacheEntry {
@@ -103,8 +105,9 @@ function parseGame(body: unknown, url: string): IChessGameDetails | null {
     winner: readWinner(result, readString(game.colorOfWinner)),
     resultMessage: readString(game.resultMessage),
     timeControl: formatTimeControl(readString(headers.TimeControl)),
-    opening: readString(headers.ECO),
+    opening: openingName(readString(game.moveList), readString(headers.ECO)),
     playedAt: readPlayedAt(game.endTime),
+    moveList: readString(game.moveList),
   }
 }
 

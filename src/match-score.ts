@@ -19,6 +19,7 @@ export interface IScoreGameInput {
   result: '1-0' | '0-1' | '1/2-1/2' | null
   summary: string | null
   playedAt: string | null
+  moveList: string | null
 }
 
 export interface IScorePairInput {
@@ -35,6 +36,7 @@ export interface IBoardGame {
   winnerName: string | null
   summary: string | null
   playedAt: string | null
+  moveList: string | null
 }
 
 export interface IBoardPair {
@@ -151,6 +153,7 @@ export function scorePair(input: IScorePairInput, aliases: Map<string, string>):
       winnerName: outcome === 'white' ? input.white : outcome === 'black' ? black : null,
       summary: game.summary,
       playedAt: game.playedAt,
+      moveList: game.moveList,
     })
   }
 

@@ -104,6 +104,7 @@ function toKnownGame(url: string, details: IChessGameDetails | null): IScoreGame
       result: null,
       summary: null,
       playedAt: null,
+      moveList: null,
     }
   }
 
@@ -115,6 +116,7 @@ function toKnownGame(url: string, details: IChessGameDetails | null): IScoreGame
     result: details.result,
     summary: details.resultMessage,
     playedAt: details.playedAt,
+    moveList: details.moveList,
   }
 }
 

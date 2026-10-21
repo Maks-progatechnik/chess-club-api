@@ -7,6 +7,9 @@
   "dependencies": {
     "@clerk/backend": "^3.24.0",
     "@clerk/hono": "^0.1.89",
+    "@savi2w/chess-tcn": "^1.0.0",
+    "chess-openings": "^0.1.1",
+    "chess.js": "^1.4.0",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.13",
     "postgres": "^3.4.9"

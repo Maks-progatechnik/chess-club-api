@@ -18,6 +18,7 @@ export interface IMyGame {
   timeControl: string | null
   opening: string | null
   playedAt: string | null
+  moveList: string | null
   yours: boolean
 }
 
@@ -93,6 +94,7 @@ async function describeGame(subject: IGameSubject, listed: IListedGame): Promise
       timeControl: null,
       opening: null,
       playedAt: listed.fallbackAt,
+      moveList: null,
       yours: false,
     }
   }
@@ -115,6 +117,7 @@ async function describeGame(subject: IGameSubject, listed: IListedGame): Promise
     timeControl: details.timeControl,
     opening: details.opening,
     playedAt: details.playedAt ?? listed.fallbackAt,
+    moveList: details.moveList,
     yours,
   }
 }
