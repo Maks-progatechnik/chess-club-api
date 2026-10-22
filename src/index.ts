@@ -1,10 +1,12 @@
 import { clerkMiddleware, getAuth } from '@clerk/hono'
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { cors } from 'hono/cors'
 import { getMyAccount, listAccounts, saveMyAccount } from './accounts'
 import { addDummy, claimDummy, deleteDummy, listDummies } from './dummies'
 import { readBoard } from './board'
 import { addDrawGame, listDraws, saveDraw } from './draws'
+import { generateNextRound } from './next-round'
 import { listMyGames } from './my-games'
 import { getPlayer } from './players'
 import { readAutumnBoard } from './autumn'
@@ -301,6 +303,29 @@ app.post('/draws', async (c) => {
   return c.json(result.draw, 201)
 })
 
+app.post('/draws/next', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const round = await readRound(c)
+  if (round === null) {
+    return c.json({ error: 'Send the round number.' }, 400)
+  }
+
+  const result = await generateNextRound(round)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+
+  return c.json(result.draw, 201)
+})
+
 app.post('/draws/:id/games', async (c) => {
   if (!clerkConfigured) {
     return c.json({ error: 'Clerk is not configured on the API' }, 503)
@@ -343,6 +368,23 @@ app.get('/tournaments/autumn-2026', async (c) => {
 
   return c.json(await readAutumnBoard())
 })
+
+async function readRound(c: Context): Promise<number | null> {
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return null
+  }
+  if (!isRecord(body) || typeof body.round !== 'number') {
+    return null
+  }
+  return body.round
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
 
 const port = Number(process.env.PORT ?? 3000)
 

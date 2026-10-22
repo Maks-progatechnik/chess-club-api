@@ -12,8 +12,15 @@ interface ITcnStep {
   promotion?: string
 }
 
-interface ISwingState {
-  deficit: number
+export interface ISwingStep {
+  balance: number
+  captured: boolean
+  to: string
+}
+
+interface IReplayMove {
+  captured?: string
+  to: string
 }
 
 type Promotion = 'q' | 'r' | 'b' | 'n'
@@ -26,7 +33,7 @@ export function materialSwing(moveList: string | null, winner: 'white' | 'black'
   }
 
   const chess = new Chess()
-  const state: ISwingState = { deficit: 0 }
+  const steps: ISwingStep[] = []
   const winnerColor = winner === 'white' ? 'w' : 'b'
   const opponentColor = winner === 'white' ? 'b' : 'w'
 
@@ -45,15 +52,15 @@ export function materialSwing(moveList: string | null, winner: 'white' | 'black'
     if (!played) {
       return null
     }
-    noteSwing(chess, state, winnerColor, opponentColor)
+    remember(steps, chess, winnerColor, opponentColor, played)
   }
 
-  return state
+  return { deficit: settledMaterialDeficit(steps) }
 }
 
 export function materialSwingFromSans(moves: string[], winner: 'white' | 'black'): IMaterialSwing | null {
   const chess = new Chess()
-  const state: ISwingState = { deficit: 0 }
+  const steps: ISwingStep[] = []
   const winnerColor = winner === 'white' ? 'w' : 'b'
   const opponentColor = winner === 'white' ? 'b' : 'w'
 
@@ -62,17 +69,36 @@ export function materialSwingFromSans(moves: string[], winner: 'white' | 'black'
     if (!played) {
       return null
     }
-    noteSwing(chess, state, winnerColor, opponentColor)
+    remember(steps, chess, winnerColor, opponentColor, played)
   }
 
-  return state
+  return { deficit: settledMaterialDeficit(steps) }
 }
 
-function noteSwing(chess: Chess, state: ISwingState, winner: Color, opponent: Color): void {
-  const balance = material(chess, winner) - material(chess, opponent)
-  if (balance < state.deficit) {
-    state.deficit = balance
+export function settledMaterialDeficit(steps: ISwingStep[]): number {
+  let deficit = 0
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index]
+    const next = steps[index + 1]
+    if (!step) {
+      continue
+    }
+    if (next && step.captured && next.captured && next.to === step.to) {
+      continue
+    }
+    if (step.balance < deficit) {
+      deficit = step.balance
+    }
   }
+  return deficit
+}
+
+function remember(steps: ISwingStep[], chess: Chess, winner: Color, opponent: Color, played: IReplayMove): void {
+  steps.push({
+    balance: material(chess, winner) - material(chess, opponent),
+    captured: Boolean(played.captured),
+    to: played.to,
+  })
 }
 
 function material(chess: Chess, color: Color): number {

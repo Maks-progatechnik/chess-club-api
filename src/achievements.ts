@@ -233,7 +233,7 @@ function tournamentFinished(draws: IBoardDraw[]): boolean {
   }
   for (const draw of draws) {
     for (const pair of draw.pairs) {
-      if (pair.status !== 'played' && pair.status !== 'split' && pair.status !== 'bye') {
+      if (pair.status !== 'played' && pair.status !== 'split' && pair.status !== 'bye' && pair.status !== 'skipped') {
         return false
       }
     }

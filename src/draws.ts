@@ -3,14 +3,15 @@ import { chessGameUrl } from './chess-game'
 import { db } from './db/client'
 import { draws } from './db/schema'
 
-interface IPairing {
+export interface IPairing {
   white: string
   black: string | null
   games: string[]
   across?: boolean
+  skipped?: boolean
 }
 
-interface IDrawResult {
+export interface IDrawResult {
   beginner: IPairing[]
   advanced: IPairing[]
 }
@@ -87,6 +88,9 @@ export async function addDrawGame(drawId: number, body: unknown): Promise<SaveDr
   const pair = pairs.find((item) => samePlayer(item.white, request.white) && samePlayer(item.black, request.black))
   if (!pair?.black) {
     return { ok: false, status: 400, error: 'That match is not in this draw.' }
+  }
+  if (pair.skipped) {
+    return { ok: false, status: 409, error: 'That round is closed.' }
   }
   if (pair.games.includes(request.url)) {
     return { ok: false, status: 409, error: 'That game is already on this match.' }
@@ -174,6 +178,9 @@ function parsePair(value: unknown): IPairing | null {
   if (value.across === true) {
     pair.across = true
   }
+  if (value.skipped === true) {
+    pair.skipped = true
+  }
   return pair
 }
 
@@ -196,6 +203,57 @@ function parseGames(value: unknown): string[] | null {
     games.push(url)
   }
   return games
+}
+
+export interface INextRoundWrite {
+  expectedCount: number
+  previousId: number
+  previous: IDrawResult
+  next: IDrawResult
+}
+
+export async function saveNextRound(input: INextRoundWrite): Promise<SaveDrawResult> {
+  const { expectedCount, previousId, previous, next } = input
+
+  try {
+    return await db.transaction(async (tx) => {
+      const locked = await tx.select().from(draws).for('update')
+      if (locked.length !== expectedCount) {
+        return { ok: false, status: 409, error: 'That round is already drawn.' }
+      }
+      const fresh = locked.find((row) => row.id === previousId)
+      const parsed = fresh ? parseDrawResult(fresh.result) : null
+      if (!parsed) {
+        return { ok: false, status: 400, error: 'The current round was not found.' }
+      }
+
+      await tx.update(draws).set({ result: mergeSkips(parsed, previous) }).where(eq(draws.id, previousId))
+      const [row] = await tx.insert(draws).values({ result: next }).returning()
+      const draw = row ? toSavedDraw(row) : null
+      if (!draw) {
+        throw new Error('Could not save this draw.')
+      }
+      return { ok: true, draw }
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not save this draw.'
+    return { ok: false, status: 400, error: message }
+  }
+}
+
+function mergeSkips(fresh: IDrawResult, plan: IDrawResult): IDrawResult {
+  return {
+    beginner: fresh.beginner.map((pair) => keepSkip(pair, plan.beginner)),
+    advanced: fresh.advanced.map((pair) => keepSkip(pair, plan.advanced)),
+  }
+}
+
+function keepSkip(pair: IPairing, planned: IPairing[]): IPairing {
+  const match = planned.find((item) => samePlayer(item.white, pair.white) && samePlayer(item.black, pair.black))
+  if (!match?.skipped || match.games.length !== pair.games.length) {
+    return pair
+  }
+  return { ...pair, skipped: true }
 }
 
 function toSavedDraw(row: IDrawRow): ISavedDraw | null {

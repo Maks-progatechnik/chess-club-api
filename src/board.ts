@@ -2,6 +2,8 @@ import { achievementsFrom } from './achievements'
 import type { IAchievements } from './achievements'
 import { statsFrom } from './club-stats'
 import type { IClubStats } from './club-stats'
+import { gameStandingsFrom, gamesFrom } from './game-table'
+import type { IClubGameRow, IGameStanding } from './game-table'
 import { listDraws } from './draws'
 import type { ISavedDraw } from './draws'
 import { lookupChessGame } from './chess-game-lookup'
@@ -15,10 +17,13 @@ import { readSignups } from './registrations'
 export type { IBoardDraw, IBoardGame, IBoardPair, IClubBoard, IStanding } from './match-score'
 export type { IAchievements, IRecordMark } from './achievements'
 export type { IClubStats, IOpeningCount } from './club-stats'
+export type { IClubGameRow, IGameStanding } from './game-table'
 
 interface IBoardResponse extends IClubBoard {
   achievements: IAchievements
   stats: IClubStats
+  games: IClubGameRow[]
+  gameStandings: IGameStanding[]
 }
 
 const LOOKUP_LIMIT = 4
@@ -28,6 +33,7 @@ interface ISourcePair {
   black: string | null
   games: string[]
   across?: boolean
+  skipped?: boolean
 }
 
 export async function readBoard(): Promise<IBoardResponse> {
@@ -37,12 +43,15 @@ export async function readBoard(): Promise<IBoardResponse> {
   const chronological = [...draws].sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id - right.id)
   const scored = chronological.map((draw, index) => scoreDraw(draw, index + 1, lookedUp, club.aliases))
   const standings = standingsFrom(scored)
+  const games = gamesFrom(scored)
 
   return {
     draws: [...scored].reverse(),
     standings,
     achievements: achievementsFrom(scored, standings),
     stats: statsFrom(scored, club.members),
+    games,
+    gameStandings: gameStandingsFrom(games),
   }
 }
 
@@ -109,6 +118,7 @@ function toPairInput(
     white: pair.white,
     black: pair.black,
     across: pair.across === true,
+    skipped: pair.skipped === true,
     games: pair.games.map((url) => toKnownGame(url, lookedUp.get(url) ?? null)),
   }
 }

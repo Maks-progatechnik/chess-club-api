@@ -4,7 +4,7 @@ export const SPLIT_POINT = 0.5
 
 export type BoardGroup = 'beginner' | 'advanced'
 export type GameOutcome = 'white' | 'black' | 'draw' | 'unknown'
-export type MatchStatus = 'open' | 'playing' | 'played' | 'split' | 'bye'
+export type MatchStatus = 'open' | 'playing' | 'played' | 'split' | 'bye' | 'skipped'
 
 export interface IScoreAlias {
   username: string
@@ -28,6 +28,7 @@ export interface IScorePairInput {
   white: string
   black: string | null
   across: boolean
+  skipped: boolean
   games: IScoreGameInput[]
 }
 
@@ -161,7 +162,15 @@ export function scorePair(input: IScorePairInput, aliases: Map<string, string>):
   }
 
   const winner = settled === 'white' ? input.white : settled === 'black' ? black : null
-  const status: MatchStatus = settled === 'split' ? 'split' : winner ? 'played' : games.length > 0 ? 'playing' : 'open'
+  const status: MatchStatus = input.skipped
+    ? 'skipped'
+    : settled === 'split'
+      ? 'split'
+      : winner
+        ? 'played'
+        : games.length > 0
+          ? 'playing'
+          : 'open'
 
   return {
     group: input.group,
@@ -172,9 +181,9 @@ export function scorePair(input: IScorePairInput, aliases: Map<string, string>):
     whiteGameWins,
     blackGameWins,
     status,
-    winner,
-    whitePoints: settled === 'white' ? 1 : settled === 'split' ? SPLIT_POINT : 0,
-    blackPoints: settled === 'black' ? 1 : settled === 'split' ? SPLIT_POINT : 0,
+    winner: input.skipped ? null : winner,
+    whitePoints: input.skipped ? 0 : settled === 'white' ? 1 : settled === 'split' ? SPLIT_POINT : 0,
+    blackPoints: input.skipped ? 0 : settled === 'black' ? 1 : settled === 'split' ? SPLIT_POINT : 0,
   }
 }
 
@@ -296,6 +305,9 @@ function bucketFor(buckets: Map<string, IStandingBucket>, name: string): IStandi
 }
 
 function recordResult(bucket: IStandingBucket, pair: IBoardPair, side: 'white' | 'black') {
+  if (pair.status === 'skipped') {
+    return
+  }
   const finished = pair.status === 'played' || pair.status === 'split' || pair.status === 'bye'
   if (!finished || (pair.status === 'bye' && side === 'black')) {
     return
