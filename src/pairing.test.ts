@@ -3,7 +3,7 @@ import { materialSwingFromSans, settledMaterialDeficit } from './material-swing'
 import type { ISwingStep } from './material-swing'
 import { gameStandingsFrom } from './game-table'
 import type { IClubGameRow } from './game-table'
-import { swissGroups } from './swiss'
+import { swissPairs } from './swiss'
 import type { ISwissPlayer } from './swiss'
 
 describe('recovery', () => {
@@ -63,50 +63,75 @@ describe('domestic elo', () => {
 
 describe('swiss', () => {
   test('pairs the score groups and gives white to the higher player', () => {
-    const groups = swissGroups([
-      player('Ada', 'advanced', 1),
-      player('Bea', 'advanced', 1),
-      player('Cid', 'advanced', 0),
-      player('Dee', 'advanced', 0),
-    ])
-    expect(groups.advanced.map(label)).toEqual(['Ada–Bea', 'Cid–Dee'])
-    expect(groups.beginner).toEqual([])
+    const pairs = swissPairs(
+      [player('Ada', 1), player('Bea', 1), player('Cid', 0), player('Dee', 0)],
+      keepOrder,
+    )
+    expect(pairs.map(label)).toEqual(['Ada–Bea', 'Cid–Dee'])
   })
 
-  test('avoids a rematch and flips colors', () => {
-    const ada = player('Ada', 'advanced', 1)
+  test('a tied score group is shuffled, so the last name is not the one who plays down', () => {
+    const rolls = [0, 0.5]
+    let cursor = 0
+    const pairs = swissPairs(
+      [player('Ada', 1), player('Bea', 1), player('Cid', 1), player('Dee', 0)],
+      () => rolls[cursor++] ?? 0,
+    )
+    expect(pairs.map(label)).toEqual(['Cid–Bea', 'Ada–Dee'])
+  })
+
+  test('a player on 0 who won a game plays a random player on 1', () => {
+    const ada = player('Ada', 1)
+    ada.opponents = ['vlad']
+    const vlad = player('Vlad', 0)
+    vlad.gameWins = 1
+    vlad.opponents = ['ada']
+    let cursor = 0
+    const rolls = [0]
+    const pairs = swissPairs(
+      [ada, player('Bea', 1), player('Cid', 1), vlad, player('Dee', 0)],
+      () => rolls[cursor++] ?? 0.999999999999,
+    )
+    expect(pairs.map(label)).toEqual(['Bea–Vlad', 'Ada–Cid', 'Dee'])
+  })
+
+  test('flips colors when a score group has to rematch', () => {
+    const ada = player('Ada', 1)
     ada.whites = 1
     ada.lastColor = 'white'
     ada.opponents = ['bea']
-    const bea = player('Bea', 'advanced', 1)
+    const bea = player('Bea', 1)
     bea.blacks = 1
     bea.lastColor = 'black'
     bea.opponents = ['ada']
-    const cid = player('Cid', 'advanced', 0)
+    const cid = player('Cid', 0)
     cid.whites = 1
     cid.lastColor = 'white'
     cid.opponents = ['dee']
-    const dee = player('Dee', 'advanced', 0)
+    const dee = player('Dee', 0)
     dee.blacks = 1
     dee.lastColor = 'black'
     dee.opponents = ['cid']
 
-    const groups = swissGroups([ada, bea, cid, dee])
-    expect(groups.advanced.map(label)).toEqual(['Cid–Ada', 'Bea–Dee'])
+    const pairs = swissPairs([ada, bea, cid, dee], keepOrder)
+    expect(pairs.map(label)).toEqual(['Bea–Ada', 'Dee–Cid'])
   })
 
-  test('the lowest player without a bye sits out an odd group', () => {
-    const ada = player('Ada', 'beginner', 1)
+  test('the lowest player without a bye sits out an odd field', () => {
+    const ada = player('Ada', 1)
     ada.hadBye = true
-    const groups = swissGroups([ada, player('Bea', 'beginner', 1), player('Cid', 'beginner', 0)])
-    expect(groups.beginner.map(label)).toEqual(['Ada–Bea', 'Cid'])
+    const pairs = swissPairs([ada, player('Bea', 1), player('Cid', 0)], keepOrder)
+    expect(pairs.map(label)).toEqual(['Ada–Bea', 'Cid'])
   })
 })
 
-function player(name: string, group: 'beginner' | 'advanced', points: number): ISwissPlayer {
+function keepOrder(): number {
+  return 0.999999999999
+}
+
+function player(name: string, points: number): ISwissPlayer {
   return {
     name,
-    group,
     points,
     gameWins: 0,
     whites: 0,

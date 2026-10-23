@@ -1,5 +1,6 @@
 import { desc, eq } from 'drizzle-orm'
 import { chessGameUrl } from './chess-game'
+import { readClubNames } from './club-names'
 import { db } from './db/client'
 import { draws } from './db/schema'
 
@@ -12,8 +13,7 @@ export interface IPairing {
 }
 
 export interface IDrawResult {
-  beginner: IPairing[]
-  advanced: IPairing[]
+  pairs: IPairing[]
 }
 
 export interface ISavedDraw {
@@ -43,7 +43,7 @@ export async function listDraws(): Promise<ISavedDraw[]> {
 export async function saveDraw(body: unknown): Promise<SaveDrawResult> {
   const result = parseDrawResult(body)
   if (!result) {
-    return { ok: false, status: 400, error: 'Send beginner and advanced pairs.' }
+    return { ok: false, status: 400, error: 'Send the pairs.' }
   }
 
   const [row] = await db.insert(draws).values({ result }).returning()
@@ -59,7 +59,6 @@ export async function saveDraw(body: unknown): Promise<SaveDrawResult> {
 }
 
 interface IGameRequest {
-  group: 'beginner' | 'advanced'
   white: string
   black: string
   url: string
@@ -84,8 +83,8 @@ export async function addDrawGame(drawId: number, body: unknown): Promise<SaveDr
     return { ok: false, status: 400, error: 'That draw was not found.' }
   }
 
-  const pairs = request.group === 'beginner' ? result.beginner : result.advanced
-  const pair = pairs.find((item) => samePlayer(item.white, request.white) && samePlayer(item.black, request.black))
+  const club = await readClubNames()
+  const pair = result.pairs.find((item) => club.same(item.white, request.white) && club.same(item.black, request.black))
   if (!pair?.black) {
     return { ok: false, status: 400, error: 'That match is not in this draw.' }
   }
@@ -110,7 +109,7 @@ export async function addDrawGame(drawId: number, body: unknown): Promise<SaveDr
 }
 
 function parseGameRequest(body: unknown): IGameRequest | 'invalid-url' | null {
-  if (!isRecord(body) || (body.group !== 'beginner' && body.group !== 'advanced')) {
+  if (!isRecord(body)) {
     return null
   }
   if (typeof body.white !== 'string' || typeof body.black !== 'string' || typeof body.url !== 'string') {
@@ -125,7 +124,7 @@ function parseGameRequest(body: unknown): IGameRequest | 'invalid-url' | null {
   if (!url) {
     return 'invalid-url'
   }
-  return { group: body.group, white, black, url }
+  return { white, black, url }
 }
 
 function samePlayer(left: string | null, right: string | null): boolean {
@@ -136,12 +135,16 @@ function parseDrawResult(body: unknown): IDrawResult | null {
   if (!isRecord(body)) {
     return null
   }
+  if (Array.isArray(body.pairs)) {
+    const pairs = parsePairs(body.pairs)
+    return pairs ? { pairs } : null
+  }
   const beginner = parsePairs(body.beginner)
   const advanced = parsePairs(body.advanced)
   if (!beginner || !advanced) {
     return null
   }
-  return { beginner, advanced }
+  return { pairs: [...beginner, ...advanced] }
 }
 
 function parsePairs(value: unknown): IPairing[] | null {
@@ -243,8 +246,7 @@ export async function saveNextRound(input: INextRoundWrite): Promise<SaveDrawRes
 
 function mergeSkips(fresh: IDrawResult, plan: IDrawResult): IDrawResult {
   return {
-    beginner: fresh.beginner.map((pair) => keepSkip(pair, plan.beginner)),
-    advanced: fresh.advanced.map((pair) => keepSkip(pair, plan.advanced)),
+    pairs: fresh.pairs.map((pair) => keepSkip(pair, plan.pairs)),
   }
 }
 

@@ -1,9 +1,9 @@
 import { listAccounts } from './accounts'
 import type { IAccount } from './accounts'
+import { readClubNames } from './club-names'
 import { listPlayerGames } from './my-games'
 import type { IMyGame } from './my-games'
 import { readSignups } from './registrations'
-import type { ISignup } from './registrations'
 
 export interface IPlayer {
   name: string
@@ -20,44 +20,28 @@ export async function getPlayer(rawName: string): Promise<IPlayer | null> {
     return null
   }
 
-  const [signups, roster] = await Promise.all([readSignups(), listAccounts()])
-  const signup = signups.find((row) => sameName(row.name, needle)) ?? null
-  const matches = roster.filter((row) => accountMatches(row, needle, signup))
-  const claimedName = signup?.name ?? needle
-  const account = matches.find((row) => row.signupName && sameName(row.signupName, claimedName)) ?? matches[0] ?? null
+  const [signups, roster, club] = await Promise.all([readSignups(), listAccounts(), readClubNames()])
+  const display = club.canonical(needle)
+  const account = roster.find((row) => club.same(fullName(row), display)) ?? null
+  const signup = signups.find((row) => club.same(row.name, display)) ?? null
   if (!signup && !account) {
     return null
   }
 
-  const name = signup?.name ?? fullName(account)
-  const names = uniqueNames([name, signup?.name, account ? fullName(account) : null, account?.signupName])
-  const chessCom = account?.chessCom ?? signup?.username ?? null
+  const name = account ? fullName(account) : display
+  const names = uniqueNames([name, signup?.name, account?.signupName, needle])
 
   return {
     name,
-    chessCom,
+    chessCom: account?.chessCom ?? signup?.username ?? null,
     elo: account?.elo ?? null,
     level: signup?.level ?? null,
     timeControl: signup?.timeControl ?? null,
-    games: await listPlayerGames({ names, chessCom }),
+    games: await listPlayerGames({ names, chessCom: account?.chessCom ?? signup?.username ?? null }),
   }
 }
 
-function accountMatches(account: IAccount, needle: string, signup: ISignup | null): boolean {
-  const full = fullName(account)
-  if (sameName(full, needle) || (account.signupName && sameName(account.signupName, needle))) {
-    return true
-  }
-  if (!signup) {
-    return false
-  }
-  return sameName(full, signup.name) || Boolean(account.signupName && sameName(account.signupName, signup.name))
-}
-
-function fullName(account: IAccount | null): string {
-  if (!account) {
-    return ''
-  }
+function fullName(account: IAccount): string {
   return `${account.name} ${account.surname}`.trim()
 }
 

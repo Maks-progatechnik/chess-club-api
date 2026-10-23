@@ -1,4 +1,6 @@
 import type { IAccount } from './accounts'
+import { readClubNames } from './club-names'
+import type { IClubNames } from './club-names'
 import { lookupChessGame } from './chess-game-lookup'
 import type { IChessGameDetails } from './chess-game-lookup'
 import { listDraws } from './draws'
@@ -41,18 +43,19 @@ export async function listMyGames(account: IAccount): Promise<IMyGame[]> {
 }
 
 export async function listPlayerGames(subject: IGameSubject): Promise<IMyGame[]> {
-  const listed = await listedGames(subject.names)
+  const club = await readClubNames()
+  const listed = await listedGames(subject.names, club)
   const games = await mapPool(listed, LOOKUP_LIMIT, (game) => describeGame(subject, game))
   return games.sort((left, right) => (right.playedAt ?? '').localeCompare(left.playedAt ?? ''))
 }
 
-async function listedGames(names: string[]): Promise<IListedGame[]> {
+async function listedGames(names: string[], club: IClubNames): Promise<IListedGame[]> {
   const draws = await listDraws()
   const listed: IListedGame[] = []
   const seen = new Set<string>()
 
   for (const draw of draws) {
-    const pairs = [...draw.result.beginner, ...draw.result.advanced]
+    const pairs = draw.result.pairs
     for (const pair of pairs) {
       if (!pair.black) {
         continue
@@ -61,7 +64,7 @@ async function listedGames(names: string[]): Promise<IListedGame[]> {
       if (!color) {
         continue
       }
-      const opponent = color === 'white' ? pair.black : pair.white
+      const opponent = club.canonical(color === 'white' ? pair.black : pair.white)
       for (const url of pair.games) {
         const key = `${url.toLowerCase()}|${opponent.toLowerCase()}`
         if (seen.has(key)) {

@@ -3,7 +3,6 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { cors } from 'hono/cors'
 import { getMyAccount, listAccounts, saveMyAccount } from './accounts'
-import { addDummy, claimDummy, deleteDummy, listDummies } from './dummies'
 import { readBoard } from './board'
 import { addDrawGame, listDraws, saveDraw } from './draws'
 import { generateNextRound } from './next-round'
@@ -164,94 +163,6 @@ app.get('/players/:name', async (c) => {
   return c.json({ player })
 })
 
-app.get('/dummies', async (c) => {
-  if (!clerkConfigured) {
-    return c.json({ error: 'Clerk is not configured on the API' }, 503)
-  }
-
-  const { userId } = getAuth(c)
-  if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  return c.json({ dummies: await listDummies(userId) })
-})
-
-app.post('/dummies', async (c) => {
-  if (!clerkConfigured) {
-    return c.json({ error: 'Clerk is not configured on the API' }, 503)
-  }
-
-  const { userId } = getAuth(c)
-  if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  let body: unknown
-  try {
-    body = await c.req.json()
-  } catch {
-    return c.json({ error: 'Name is required.' }, 400)
-  }
-
-  const result = await addDummy(body)
-  if (!result.ok) {
-    return c.json({ error: result.error }, result.status)
-  }
-
-  return c.json(result.dummy, 201)
-})
-
-app.post('/dummies/claim', async (c) => {
-  if (!clerkConfigured) {
-    return c.json({ error: 'Clerk is not configured on the API' }, 503)
-  }
-
-  const { userId } = getAuth(c)
-  if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  let body: unknown
-  try {
-    body = await c.req.json()
-  } catch {
-    return c.json({ error: 'Choose a player.' }, 400)
-  }
-
-  const result = await claimDummy(userId, body)
-  if (!result.ok) {
-    return c.json({ error: result.error }, result.status)
-  }
-
-  return c.json(result.dummy)
-})
-
-app.delete('/dummies', async (c) => {
-  if (!clerkConfigured) {
-    return c.json({ error: 'Clerk is not configured on the API' }, 503)
-  }
-
-  const { userId } = getAuth(c)
-  if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  let body: unknown
-  try {
-    body = await c.req.json()
-  } catch {
-    return c.json({ error: 'Choose a player.' }, 400)
-  }
-
-  const result = await deleteDummy(body)
-  if (!result.ok) {
-    return c.json({ error: result.error }, result.status)
-  }
-
-  return c.json({ name: result.name })
-})
-
 app.get('/board', async (c) => {
   if (!clerkConfigured) {
     return c.json({ error: 'Clerk is not configured on the API' }, 503)
@@ -292,7 +203,7 @@ app.post('/draws', async (c) => {
   try {
     body = await c.req.json()
   } catch {
-    return c.json({ error: 'Send beginner and advanced pairs.' }, 400)
+    return c.json({ error: 'Send the pairs.' }, 400)
   }
 
   const result = await saveDraw(body)

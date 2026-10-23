@@ -2,7 +2,6 @@ export const WINS_TO_TAKE_THE_MATCH = 2
 export const DRAWS_TO_SPLIT_THE_MATCH = 2
 export const SPLIT_POINT = 0.5
 
-export type BoardGroup = 'beginner' | 'advanced'
 export type GameOutcome = 'white' | 'black' | 'draw' | 'unknown'
 export type MatchStatus = 'open' | 'playing' | 'played' | 'split' | 'bye' | 'skipped'
 
@@ -24,7 +23,6 @@ export interface IScoreGameInput {
 }
 
 export interface IScorePairInput {
-  group: BoardGroup
   white: string
   black: string | null
   across: boolean
@@ -43,7 +41,6 @@ export interface IBoardGame {
 }
 
 export interface IBoardPair {
-  group: BoardGroup
   white: string
   black: string | null
   across: boolean
@@ -108,7 +105,6 @@ export function aliasMap(rows: IScoreAlias[]): Map<string, string> {
 export function scorePair(input: IScorePairInput, aliases: Map<string, string>): IBoardPair {
   if (!input.black) {
     return {
-      group: input.group,
       white: input.white,
       black: null,
       across: input.across,
@@ -173,7 +169,6 @@ export function scorePair(input: IScorePairInput, aliases: Map<string, string>):
           : 'open'
 
   return {
-    group: input.group,
     white: input.white,
     black,
     across: input.across,
