@@ -9,9 +9,22 @@ export interface ISwissPlayer {
   hadBye: boolean
 }
 
+export interface ISwissSide {
+  name: string
+  points: number
+  gameWins: number
+}
+
+export type SwissPairKind = 'same' | 'up' | 'down' | 'bye'
+
 export interface ISwissPair {
   white: string
   black: string | null
+  kind: SwissPairKind
+  rematch: boolean
+  reason: string
+  whitePlayer: ISwissSide
+  blackPlayer: ISwissSide | null
 }
 
 interface IPointBand {
@@ -45,7 +58,7 @@ export function swissPairs(players: ISwissPlayer[], random: () => number = Math.
       used.add(nameKey(climber.name))
       used.add(nameKey(opponent.name))
       higher.players = higher.players.filter((player) => nameKey(player.name) !== nameKey(opponent.name))
-      pairs.push(seat(opponent, climber))
+      pairs.push(explain(opponent, climber, 'up', upReason(climber, opponent, floor)))
     }
   }
 
@@ -74,7 +87,7 @@ export function swissPairs(players: ISwissPlayer[], random: () => number = Math.
       seated.add(nameKey(opponent.name))
       used.add(nameKey(player.name))
       used.add(nameKey(opponent.name))
-      pairs.push(seat(player, opponent))
+      pairs.push(explain(player, opponent, 'same', sameReason(player, opponent)))
     }
 
     for (const player of waiting) {
@@ -89,13 +102,13 @@ export function swissPairs(players: ISwissPlayer[], random: () => number = Math.
       used.add(nameKey(player.name))
       used.add(nameKey(opponent.name))
       next.players = next.players.filter((item) => nameKey(item.name) !== nameKey(opponent.name))
-      pairs.push(seat(player, opponent))
+      pairs.push(explain(player, opponent, 'down', downReason(player, opponent)))
     }
 
     if (!next) {
       const bye = takeBye(waiting.filter((player) => !used.has(nameKey(player.name))))
       if (bye) {
-        pairs.push({ white: bye.name, black: null })
+        pairs.push(explain(bye, null, 'bye', byeReason(bye)))
       }
     }
   }
@@ -137,10 +150,90 @@ function pickOpponent(
   return choices[index] ?? null
 }
 
-function seat(left: ISwissPlayer, right: ISwissPlayer): ISwissPair {
+function explain(left: ISwissPlayer, right: ISwissPlayer | null, kind: SwissPairKind, reason: string): ISwissPair {
+  if (!right) {
+    return {
+      white: left.name,
+      black: null,
+      kind,
+      rematch: false,
+      reason,
+      whitePlayer: toSide(left),
+      blackPlayer: null,
+    }
+  }
   const white = chooseWhite(left, right)
   const black = white === left ? right : left
-  return { white: white.name, black: black.name }
+  return {
+    white: white.name,
+    black: black.name,
+    kind,
+    rematch: hasPlayed(left, right),
+    reason: `${reason} ${colorReason(white, black)}`,
+    whitePlayer: toSide(white),
+    blackPlayer: toSide(black),
+  }
+}
+
+function toSide(player: ISwissPlayer): ISwissSide {
+  return { name: player.name, points: player.points, gameWins: player.gameWins }
+}
+
+function upReason(climber: ISwissPlayer, opponent: ISwissPlayer, floor: number): string {
+  return `${climber.name} is on ${pointsText(climber.points)} with ${winsText(climber.gameWins)}. Others on that score have ${winsText(floor)}, so ${climber.name} plays a random player on ${pointsText(opponent.points)}.`
+}
+
+function sameReason(left: ISwissPlayer, right: ISwissPlayer): string {
+  const rematch = hasPlayed(left, right) ? ' They already played, and nobody else on this score was free.' : ''
+  return `Both are on ${pointsText(left.points)}, with ${winsText(left.gameWins)} and ${winsText(right.gameWins)}. Same score is drawn at random.${rematch}`
+}
+
+function downReason(left: ISwissPlayer, right: ISwissPlayer): string {
+  return `${left.name} was left over on ${pointsText(left.points)}. That score had an odd count, so they play a random player on ${pointsText(right.points)}.`
+}
+
+function byeReason(player: ISwissPlayer): string {
+  if (player.hadBye) {
+    return `${player.name} sits out on ${pointsText(player.points)}. Everyone still waiting has already had a bye.`
+  }
+  return `${player.name} sits out on ${pointsText(player.points)} with ${winsText(player.gameWins)}. The remaining field is odd, and this player has not had a bye.`
+}
+
+function colorReason(white: ISwissPlayer, black: ISwissPlayer): string {
+  const whiteDue = dueWhite(white)
+  const blackDue = dueWhite(black)
+  if (whiteDue === true && blackDue !== true) {
+    return `${white.name} is White because ${dueCause(white)}.`
+  }
+  if (whiteDue === blackDue) {
+    return `Both are due the same color, so ${white.name} takes White from the draw order.`
+  }
+  return `${black.name} is due Black, so ${white.name} is White.`
+}
+
+function dueCause(player: ISwissPlayer): string {
+  if (player.whites < player.blacks) {
+    return 'they have played White less often'
+  }
+  if (player.lastColor === 'black') {
+    return 'they had Black last round'
+  }
+  return 'they have no color yet'
+}
+
+function pointsText(points: number): string {
+  const shown = Number.isInteger(points) ? String(points) : points.toFixed(1)
+  return shown === '1' ? '1 point' : `${shown} points`
+}
+
+function winsText(wins: number): string {
+  if (wins === 0) {
+    return 'no game wins'
+  }
+  if (wins === 1) {
+    return '1 game win'
+  }
+  return `${wins} game wins`
 }
 
 function takeBye(ranked: ISwissPlayer[]): ISwissPlayer | null {

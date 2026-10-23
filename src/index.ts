@@ -5,7 +5,7 @@ import { cors } from 'hono/cors'
 import { getMyAccount, listAccounts, saveMyAccount } from './accounts'
 import { readBoard } from './board'
 import { addDrawGame, listDraws, saveDraw } from './draws'
-import { generateNextRound } from './next-round'
+import { generateNextRound, previewNextRound } from './next-round'
 import { listMyGames } from './my-games'
 import { getPlayer } from './players'
 import { readAutumnBoard } from './autumn'
@@ -235,6 +235,29 @@ app.post('/draws/next', async (c) => {
   }
 
   return c.json(result.draw, 201)
+})
+
+app.post('/draws/preview', async (c) => {
+  if (!clerkConfigured) {
+    return c.json({ error: 'Clerk is not configured on the API' }, 503)
+  }
+
+  const { userId } = getAuth(c)
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const round = await readRound(c)
+  if (round === null) {
+    return c.json({ error: 'Send the round number.' }, 400)
+  }
+
+  const result = await previewNextRound(round)
+  if (!result.ok) {
+    return c.json({ error: result.error }, result.status)
+  }
+
+  return c.json({ round: result.round, pairs: result.pairs })
 })
 
 app.post('/draws/:id/games', async (c) => {

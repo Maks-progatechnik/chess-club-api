@@ -24,12 +24,46 @@ interface IRoundPlan {
   previousId: number
   closed: IDrawResult
   next: IDrawResult
+  explained: ISwissPair[]
 }
 
 type RoundPlanResult = { ok: true; plan: IRoundPlan } | { ok: false; status: 400 | 409; error: string }
 
+export interface IPreviewSide {
+  name: string
+  points: number
+  gameWins: number
+}
+
+export interface IPreviewPair {
+  white: string
+  black: string | null
+  kind: ISwissPair['kind']
+  rematch: boolean
+  reason: string
+  whitePlayer: IPreviewSide
+  blackPlayer: IPreviewSide | null
+}
+
+export type PreviewRoundResult =
+  | { ok: true; round: number; pairs: IPreviewPair[] }
+  | { ok: false; status: 400 | 409; error: string }
+
+export async function previewNextRound(round: number): Promise<PreviewRoundResult> {
+  const planned = await planNextRound(round, true)
+  if (!planned.ok) {
+    return planned
+  }
+
+  return {
+    ok: true,
+    round,
+    pairs: planned.plan.explained.map(toPreviewPair),
+  }
+}
+
 export async function generateNextRound(round: number): Promise<SaveDrawResult> {
-  const planned = await planNextRound(round)
+  const planned = await planNextRound(round, false)
   if (!planned.ok) {
     return planned
   }
@@ -42,11 +76,11 @@ export async function generateNextRound(round: number): Promise<SaveDrawResult> 
   })
 }
 
-async function planNextRound(round: number): Promise<RoundPlanResult> {
+async function planNextRound(round: number, ignoreDate: boolean): Promise<RoundPlanResult> {
   if (!Number.isInteger(round) || round < 2 || round > ROUND_LIMIT) {
     return { ok: false, status: 400, error: 'That round cannot be drawn.' }
   }
-  if (!roundIsDue(round)) {
+  if (!ignoreDate && !roundIsDue(round)) {
     return { ok: false, status: 400, error: 'That round is not ready to draw yet.' }
   }
 
@@ -71,8 +105,9 @@ async function planNextRound(round: number): Promise<RoundPlanResult> {
   }
 
   const players = swissPlayers(board.standings, [...board.draws].reverse())
+  const explained = swissPairs(players)
   const next: IDrawResult = {
-    pairs: swissPairs(players).map(toStoredPair),
+    pairs: explained.map(toStoredPair),
   }
   const closed = withSkips(previous.result, scored, club)
 
@@ -83,6 +118,7 @@ async function planNextRound(round: number): Promise<RoundPlanResult> {
       previousId: previous.id,
       closed,
       next,
+      explained,
     },
   }
 }
@@ -157,6 +193,18 @@ function unfinished(pair: IBoardPair): boolean {
 
 function toStoredPair(pair: ISwissPair): IPairing {
   return { white: pair.white, black: pair.black, games: [] }
+}
+
+function toPreviewPair(pair: ISwissPair): IPreviewPair {
+  return {
+    white: pair.white,
+    black: pair.black,
+    kind: pair.kind,
+    rematch: pair.rematch,
+    reason: pair.reason,
+    whitePlayer: pair.whitePlayer,
+    blackPlayer: pair.blackPlayer,
+  }
 }
 
 function takeHistory(history: Map<string, IHistory>, name: string): IHistory {

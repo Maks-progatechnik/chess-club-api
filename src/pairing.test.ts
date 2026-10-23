@@ -93,6 +93,10 @@ describe('swiss', () => {
       () => rolls[cursor++] ?? 0.999999999999,
     )
     expect(pairs.map(label)).toEqual(['Bea–Vlad', 'Ada–Cid', 'Dee'])
+    const vladPair = pairs.find((pair) => pair.white === 'Vlad' || pair.black === 'Vlad')
+    expect(vladPair?.kind).toBe('up')
+    expect(vladPair?.reason).toContain('1 game win')
+    expect(vladPair?.reason).toContain('random player on 1 point')
   })
 
   test('flips colors when a score group has to rematch', () => {
