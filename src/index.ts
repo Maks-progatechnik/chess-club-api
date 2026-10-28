@@ -6,6 +6,7 @@ import { getMyAccount, listAccounts, saveMyAccount } from './accounts'
 import { readBoard } from './board'
 import { addDrawGame, listDraws, saveDraw } from './draws'
 import { generateNextRound, previewNextRound } from './next-round'
+import type { DrawMode, IKeptPair } from './next-round'
 import { listMyGames } from './my-games'
 import { getPlayer } from './players'
 import { readAutumnBoard } from './autumn'
@@ -235,14 +236,17 @@ app.post('/draws/next', async (c) => {
     return c.json({ error: 'Only the organizer can do that.' }, 403)
   }
 
-  const round = await readRound(c)
-  if (round === null) {
+  const request = await readNextRound(c)
+  if (!request) {
     return c.json({ error: 'Send the round number.' }, 400)
   }
 
-  const result = await generateNextRound(round)
+  const result = await generateNextRound(request.round, request.kept, request.mode)
   if (!result.ok) {
     return c.json({ error: result.error }, result.status)
+  }
+  if ('confirm' in result) {
+    return c.json({ round: request.round, rematch: true, pairs: result.confirm })
   }
 
   return c.json(result.draw, 201)
@@ -325,6 +329,36 @@ async function readRound(c: Context): Promise<number | null> {
     return null
   }
   return body.round
+}
+
+async function readNextRound(c: Context): Promise<{ round: number; kept: IKeptPair[] | null; mode: DrawMode } | null> {
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return null
+  }
+  if (!isRecord(body) || typeof body.round !== 'number') {
+    return null
+  }
+  if (body.mode !== undefined && body.mode !== 'score' && body.mode !== 'random') {
+    return null
+  }
+  const mode: DrawMode = body.mode === 'random' ? 'random' : 'score'
+  if (body.pairs === undefined) {
+    return { round: body.round, kept: null, mode }
+  }
+  if (!Array.isArray(body.pairs)) {
+    return null
+  }
+  const kept: IKeptPair[] = []
+  for (const pair of body.pairs) {
+    if (!isRecord(pair) || typeof pair.white !== 'string' || (pair.black !== null && typeof pair.black !== 'string')) {
+      return null
+    }
+    kept.push({ white: pair.white, black: pair.black })
+  }
+  return { round: body.round, kept, mode }
 }
 
 async function readActor(c: Context, userId: string): Promise<IActor> {
