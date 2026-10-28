@@ -2,8 +2,10 @@ import { readBoard } from './board'
 import { readClubNames } from './club-names'
 import type { IClubNames } from './club-names'
 import { listDraws, saveNextRound } from './draws'
-import type { IDrawResult, IPairing, ISavedDraw, SaveDrawResult } from './draws'
+import type { IDrawResult, IPairing, ISavedDraw } from './draws'
 import type { IBoardDraw, IBoardPair, IStanding } from './match-score'
+import { revealPairs } from './reveal'
+import type { IRevealPair } from './reveal'
 import { freshSwissPairs, randomPairs } from './swiss'
 import type { ISwissPair, ISwissPlayer } from './swiss'
 
@@ -70,11 +72,14 @@ export interface IKeptPair {
 // 'score' pairs by points (the Swiss draw); 'random' ignores points.
 export type DrawMode = 'score' | 'random'
 
-export type GenerateRoundResult = SaveDrawResult | { ok: true; confirm: IPreviewPair[] }
+export type GenerateRoundResult =
+  | { ok: true; draw: ISavedDraw; pairs: IRevealPair[] }
+  | { ok: true; confirm: IPreviewPair[] }
+  | { ok: false; status: 400 | 409; error: string }
 
 // A score draw without rematches is saved straight away. A draw that repeats an old match, and every random
 // draw, is returned for the organizer to confirm instead. Kept pairs are the ones the organizer confirmed;
-// they must seat every player exactly once.
+// they must seat every player exactly once. A saved draw comes back with the points it was drawn from.
 export async function generateNextRound(round: number, kept: IKeptPair[] | null, mode: DrawMode): Promise<GenerateRoundResult> {
   const planned = await planNextRound(round, false, mode)
   if (!planned.ok) {
@@ -92,12 +97,16 @@ export async function generateNextRound(round: number, kept: IKeptPair[] | null,
     return { ok: true, confirm: planned.plan.explained.map(toPreviewPair) }
   }
 
-  return saveNextRound({
+  const saved = await saveNextRound({
     expectedCount: planned.plan.expectedCount,
     previousId: planned.plan.previousId,
     previous: planned.plan.closed,
     next,
   })
+  if (!saved.ok) {
+    return saved
+  }
+  return { ok: true, draw: saved.draw, pairs: revealPairs(next.pairs, planned.plan.explained) }
 }
 
 function checkKeptPairs(kept: IKeptPair[], planned: ISwissPair[]): IPairing[] | null {

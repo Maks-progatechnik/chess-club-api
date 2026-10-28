@@ -249,7 +249,7 @@ app.post('/draws/next', async (c) => {
     return c.json({ round: request.round, rematch: true, pairs: result.confirm })
   }
 
-  return c.json(result.draw, 201)
+  return c.json({ round: request.round, draw: result.draw, pairs: result.pairs }, 201)
 })
 
 app.post('/draws/preview', async (c) => {
